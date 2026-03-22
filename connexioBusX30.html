@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexió X30 · Casa → L'Illa</title>
+<!-- Configuración PWA móvil -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#070709">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/713/713331.png">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+<!-- LLIBRERIES EXTERNES -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+/* CONFIGURACIÓ GENERAL */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #070709; --s1: #0f0f12; --s2: #141418; --s3: #1a1a20;
+  --border: #1e1e26; --border2: #26262e;
+  --text: #e0e0e8; --muted: #484858; --muted2: #787890;
+  --green: #00e87a; --amber: #ffb800; --red: #ff3b3b; --blue: #4da8ff;
+  --x30: #c82200; --font: 'Courier New', Courier, monospace;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--font); max-width: 580px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* CAPÇALERA (Font +4px) */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--s1); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+.pill { padding: 4px 10px; border-radius: 4px; font-size: 1.05rem; font-weight: 900; } /* +4px aprox */
+.pill-x30 { background: var(--x30); color: #fff; }
+.pill-gray { background: var(--s3); color: var(--muted2); border: 1px solid var(--border2); }
+.header-sub { font-size: 0.85rem; color: var(--muted); margin-top: 4px; } /* +4px aprox */
+#clock { font-size: 1.8rem; font-weight: 700; }
+
+.main { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* BLOC MILLOR OPCIÓ (MANTÉ MIDA ORIGINAL) */
+.best-card { border-radius: 14px; padding: 20px 18px; border: 2px solid var(--border2); transition: all .4s; }
+.best-card.go { background: linear-gradient(150deg, #041409 0%, #020a05 100%); border-color: var(--green); box-shadow: 0 0 20px #00e87a15; }
+.best-card.nogo { background: linear-gradient(150deg, #140404 0%, #0a0202 100%); border-color: var(--red); }
+.best-card #best-verdict { font-size: 0.55rem; letter-spacing: 0.15em; }
+.best-card #best-time { font-size: 3.5rem; font-weight: 900; line-height: 1; }
+.best-card #best-label { font-size: 0.85rem; font-weight: 800; }
+
+/* TOTES LES OPCIONS (Font +4px) */
+.sec-label { font-size: 0.85rem; color: var(--muted); letter-spacing: 0.1em; margin: 15px 0 8px; }
+.option-card { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; position: relative; }
+.option-time-text { font-size: 1.2rem; font-weight: 700; color: var(--green); }
+
+/* TIMELINE (Font +4px) */
+.steps { display: flex; align-items: center; gap: 0; padding: 15px 0; overflow-x: auto; }
+.step { display: flex; flex-direction: column; align-items: center; min-width: 85px; position: relative; }
+.step-node { width: 10px; height: 10px; border-radius: 50%; background: var(--muted2); z-index: 2; }
+.step-node.active { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.step-node.x30node { background: var(--x30); }
+.step-connector { height: 2px; flex: 1; min-width: 40px; background: var(--border2); margin: 0 -25px; position: relative; top: -23px; z-index: 1; }
+.step-label { font-size: 0.75rem; color: var(--muted2); margin-top: 6px; text-transform: uppercase; }
+.step-time { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+
+/* CHIPS (Font +4px) */
+.x30-chip { background: var(--s2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; font-size: 0.95rem; text-align: center; }
+.catchable { border-color: var(--green); color: var(--green); }
+
+.footer { padding: 20px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+.btn { background: transparent; border: 1px solid var(--border2); color: var(--muted2); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="pill pill-gray">Casa</span> <span>&rarr;</span> <span class="pill pill-x30">X30</span>
+    </div>
+    <div class="header-sub">Millor connexió en temps real</div>
+  </div>
+  <div id="clock">--:--</div>
+</div>
+
+<div class="main">
+  <div id="st-loading" class="state-box" style="padding:40px; font-size:1.1rem">⌛ Iniciant...</div>
+  <div id="st-drop" class="state-box hidden" style="border:2px dashed var(--border2); padding:40px;">
+    <label style="cursor:pointer" for="file-input">📂 Arrossega el fitxer <b>google_transit.zip</b> aquí</label>
+    <input type="file" id="file-input" accept=".zip" style="display:none">
+  </div>
+
+  <div id="st-ready" class="hidden">
+    <!-- TARGETA PRINCIPAL (Mida bloquejada) -->
+    <div id="best-card" class="best-card">
+      <div style="display:flex; justify-content:space-between; align-items: flex-start;">
+        <div>
+          <div id="best-verdict">CALCULANT...</div>
+          <div id="best-time">-- min</div>
+          <div id="best-label">--</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.55rem; color:var(--muted); letter-spacing:0.1em">PRÒXIM X30</div>
+          <div id="best-x30time" style="font-size:1.3rem; font-weight:700">--:--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-label">TOTES LES OPCIONS</div>
+    <div id="options-grid"></div>
+
+    <div class="sec-label">PRÒXIMS X30 A 001919</div>
+    <div id="next-x30-row" style="display:flex; gap:8px; flex-wrap:wrap"></div>
+  </div>
+</div>
+
+<div class="footer">
+  <div>
+    <div id="footer-date">--</div>
+    <div onclick="openConfig()" style="color:var(--blue); cursor:pointer; text-decoration:underline; margin-top:6px">⚙️ API TMB (78 RT)</div>
+  </div>
+  <button class="btn" onclick="resetDB()">↻ NOU ZIP</button>
+</div>
+
+<!-- MODAL CONFIG -->
+<div id="modal-config" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+  <div style="background:var(--s1); border:1px solid var(--blue); border-radius:16px; width:100%; max-width:350px; padding:24px; display:flex; flex-direction:column; gap:16px;">
+    <div style="font-weight:700; color:var(--blue); font-size:1rem">API TMB (Línia 78)</div>
+    <input type="text" id="input-app-id" placeholder="APP ID" style="background:var(--bg); border:1px solid var(--border2); color:var(--text); padding:12px; border-radius:8px; font-family:var(--font);">
+    <input type="password" id="input-app-key" placeholder="APP KEY" style="background:var(--bg); border:1px solid var(--border2); color:var(--text); padding:12px; border-radius:8px; font-family:var(--font);">
+    <div style="display:flex; gap:10px;">
+      <button class="btn" onclick="closeConfig()" style="flex:1">TANCAR</button>
+      <button class="btn" onclick="saveConfig()" style="flex:1; border-color:var(--blue); color:var(--blue)">GUARDAR</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB_NAME = 'x30gtfs', STORE_NAME = 'zip', CACHE_KEY = 'google_transit';
+const WALK_DIRECT = 12, X30_STOP = '001919', IBUS_URL = 'https://api.tmb.cat/v1/ibus/stops';
+let G = null;
+
+function fmtMins(m) { return String(Math.floor(m/60)%24).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); }
+function show(id) { ['st-loading','st-drop','st-ready'].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id)); }
+
+// GESTIÓ API TMB
+function getTMBCreds() { try { return JSON.parse(localStorage.getItem('connexio_creds')); } catch(e) { return null; } }
+function openConfig() { const c = getTMBCreds(); if(c){ document.getElementById('input-app-id').value = c.appId || ''; document.getElementById('input-app-key').value = c.appKey || ''; } document.getElementById('modal-config').classList.remove('hidden'); }
+function closeConfig() { document.getElementById('modal-config').classList.add('hidden'); }
+function saveConfig() { localStorage.setItem('connexio_creds', JSON.stringify({appId: document.getElementById('input-app-id').value.trim(), appKey: document.getElementById('input-app-key').value.trim()})); closeConfig(); render(); }
+
+async function fetchTMB(stop) {
+  const c = getTMBCreds(); if(!c || !c.appId) return [];
+  try {
+    const r = await fetch(`${IBUS_URL}/${stop}?app_id=${c.appId}&app_key=${c.appKey}`);
+    const d = await r.json(); return d?.data?.ibus || [];
+  } catch(e) { return []; }
+}
+
+async function processZip(buf, skipCache = false) {
+  show('st-loading');
+  const zip = await JSZip.loadAsync(buf);
+  const getF = async (n) => { const name = Object.keys(zip.files).find(k => k.endsWith(n)); return name ? await zip.files[name].async('string') : null; };
+  const stops = Papa.parse(await getF('stops.txt'), {header:true, skipEmptyLines:true}).data;
+  const findS = (c) => stops.find(s => s.stop_code === c || s.stop_id === c);
+  const stopX30Id = findS('001919')?.stop_id;
+
+  const stopTimes = [];
+  Papa.parse(await getF('stop_times.txt'), {
+    header: true,
+    step: (row) => {
+      const d = row.data;
+      if (d.stop_id === stopX30Id || d.stop_id === findS('001657')?.stop_id || d.stop_id === findS('100292')?.stop_id) {
+        const [h,m] = (d.departure_time || "").split(':');
+        if(h) stopTimes.push({ tripId: d.trip_id, mins: parseInt(h)*60 + parseInt(m), stopId: d.stop_id });
+      }
+    },
+    complete: async () => {
+      G = { stopX30Id, stopTimes, stop1657: findS('001657')?.stop_id, stop100292: findS('100292')?.stop_id };
+      if(!skipCache) await cachePut(CACHE_KEY, {buf, cached: new Date().toISOString()});
+      show('st-ready');
+      render();
+      setInterval(render, 30000);
+    }
+  });
+}
+
+async function render() {
+  if(!G) return;
+  const now = new Date();
+  const nMins = now.getHours()*60 + now.getMinutes();
+  document.getElementById('clock').textContent = nMins >= 0 ? fmtMins(nMins) : "--:--";
+  document.getElementById('footer-date').textContent = now.toLocaleDateString();
+
+  const x30deps = G.stopTimes.filter(st => st.stopId === G.stopX30Id && st.mins >= nMins).sort((a,b) => a.mins - b.mins);
+  const iBus = await fetchTMB('001657');
+
+  const options = [];
+  options.push({ label: '🚶', arriveX30: nMins + WALK_DIRECT, type: 'walk', wait: 0 });
+
+  // L78: Busca "78" en API TMB
+  const l78rt = iBus.find(b => b.line === '78');
+  if(l78rt) {
+    options.push({ label: 'L78', arriveX30: nMins + parseInt(l78rt.t1) + 6, type: 'bus', rt: true, wait: parseInt(l78rt.t1) });
+  } else {
+    const l78gtfs = G.stopTimes.filter(st => st.stopId === G.stop1657 && st.mins >= nMins + 2)[0];
+    if(l78gtfs) options.push({ label: 'L78', arriveX30: l78gtfs.mins + 6, type: 'bus', wait: l78gtfs.mins - nMins });
+  }
+
+  // L46 i L20
+  const l46 = G.stopTimes.filter(st => st.stopId === G.stop1657 && st.mins >= nMins + 2)[0];
+  if(l46) options.push({ label: 'L46', arriveX30: l46.mins + 7, type: 'bus', wait: l46.mins - nMins });
+  const l20 = G.stopTimes.filter(st => st.stopId === G.stop100292 && st.mins >= nMins + 3.5)[0];
+  if(l20) options.push({ label: 'L20', arriveX30: l20.mins + 7, type: 'bus', wait: l20.mins - nMins });
+
+  options.sort((a,b) => a.arriveX30 - b.arriveX30);
+
+  const grid = document.getElementById('options-grid'); grid.innerHTML = '';
+  options.forEach(opt => {
+    const div = document.createElement('div');
+    div.className = 'option-card' + (opt === options[0] ? ' best-option' : '');
+    const nx = x30deps.find(x => x.mins >= opt.arriveX30);
+    const badge = opt.rt ? '<span style="color:var(--blue); font-size:0.7rem">● RT</span>' : '';
+    
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div><span class="pill pill-gray">${opt.label}</span> ${badge}</div>
+        <div class="option-time-text">${opt.wait} min</div>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="step-node active"></div><div class="step-label">Casa</div><div class="step-time">ara</div></div>
+        <div class="step-connector"></div>
+        <div class="step"><div class="step-node"></div><div class="step-label">${opt.label}</div><div class="step-time">${fmtMins(opt.arriveX30)}</div></div>
+        <div class="step-connector"></div>
+        <div class="step"><div class="step-node x30node"></div><div class="step-label">X30</div><div class="step-time">${nx ? fmtMins(nx.mins) : '--'}</div></div>
+      </div>
+    `;
+    grid.appendChild(div);
+  });
+
+  const bestX30 = x30deps.find(x => x.mins >= options[0].arriveX30);
+  if(bestX30) {
+    const canC = bestX30.mins >= nMins + WALK_DIRECT;
+    document.getElementById('best-card').className = 'best-card ' + (canC ? 'go' : 'nogo');
+    document.getElementById('best-verdict').textContent = canC ? 'MILLOR OPCIÓ DISPONIBLE' : 'PERDRÀS EL PROPER X30';
+    document.getElementById('best-time').textContent = (bestX30.mins - nMins) + ' min';
+    document.getElementById('best-label').textContent = canC ? '✓ SÍ QUE ARRIBES' : '✗ NO ARRIBARÀS';
+    document.getElementById('best-x30time').textContent = fmtMins(bestX30.mins);
+  }
+
+  const row = document.getElementById('next-x30-row'); row.innerHTML = '';
+  x30deps.slice(0, 4).forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = 'x30-chip' + (d.mins >= options[0].arriveX30 ? ' catchable' : '');
+    chip.innerHTML = `<b>${fmtMins(d.mins)}</b><br>${d.mins - nMins}m`;
+    row.appendChild(chip);
+  });
+}
+
+// INDEXED DB
+async function openDB() { return new Promise(res => { const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = e => e.target.result.createObjectStore(STORE_NAME); req.onsuccess = e => res(e.target.result); }); }
+async function cacheGet(k) { try { const db = await openDB(); return new Promise(res => { const tx = db.transaction(STORE_NAME, 'readonly'); const req = tx.objectStore(STORE_NAME).get(k); req.onsuccess = e => res(e.target.result); }); } catch(e) { return null; } }
+async function cachePut(k, v) { try { const db = await openDB(); const tx = db.transaction(STORE_NAME, 'readwrite'); tx.objectStore(STORE_NAME).put(v, k); } catch(e) {} }
+function resetDB() { indexedDB.deleteDatabase(DB_NAME); location.reload(); }
+
+(async () => {
+  const cached = await cacheGet(CACHE_KEY);
+  if(cached?.buf) await processZip(cached.buf, true);
+  else show('st-drop');
+})();
+document.getElementById('file-input').addEventListener('change', async e => { if(e.target.files[0]) await processZip(await e.target.files[0].arrayBuffer()); });
+</script>
+</body>
+</html>

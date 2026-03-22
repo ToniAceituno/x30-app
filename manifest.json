@@ -1,0 +1,17 @@
+{
+  "name": "Connexió X30",
+  "short_name": "X30",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070709",
+  "theme_color": "#070709",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/713/713331.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
